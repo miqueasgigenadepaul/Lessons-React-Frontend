@@ -1,61 +1,83 @@
 import { useState, useEffect } from 'react'
 import Footer from './components/Footer'
-import personService from './services/persons'
+import Note from './components/Note'
+import Notification from './components/Notification'
+import noteService from './services/notes'
 
 const App = () => {
-  const [persons, setPersons] = useState([])
-  const [newName, setNewName] = useState('')
-  const [newPhone, setNewPhone] = useState('')
+  const [notes, setNotes] = useState([])
+  const [newNote, setNewNote] = useState('')
+  const [showAll, setShowAll] = useState(true)
+  const [errorMessage, setErrorMessage] = useState(null)
 
   useEffect(() => {
-    personService.getAll().then((initialPersons) => {
-      if (initialPersons) {
-        setPersons(initialPersons)
-      } else {
-        console.error('La respuesta del servidor no es un array:', initialPersons)
-        setPersons([])
-      }
-    }).catch(error => {
-      console.error('Error al obtener Personas:', error)
-      setPersons([]) 
+    noteService.getAll().then((initialNotes) => {
+      setNotes(initialNotes)
     })
   }, [])
 
-  const addPerson = (event) => {
+  const addNote = (event) => {
     event.preventDefault()
-    const personObject = {
-      name: newName,
-      phone: newPhone,
+    const noteObject = {
+      content: newNote,
+      important: Math.random() > 0.5,
     }
 
-    personService.create(personObject).then((returnedPerson) => {
-      setPersons(persons.concat(returnedPerson))
-      setNewName('')
-      setNewPhone('')
+    noteService.create(noteObject).then((returnedNote) => {
+      setNotes(notes.concat(returnedNote))
+      setNewNote('')
     })
   }
 
-  const handleNameChange = (event) => setNewName(event.target.value)
-  const handlePhoneChange = (event) => setNewPhone(event.target.value)
+  const toggleImportanceOf = (id) => {
+    const note = notes.find((n) => n.id === id)
+    const changedNote = { ...note, important: !note.important }
+
+    noteService
+      .update(id, changedNote)
+      .then((returnedNote) => {
+        setNotes(notes.map((note) => (note.id !== id ? note : returnedNote)))
+      })
+      .catch((error) => {
+        setErrorMessage(
+          `Note '${note.content}' was already removed from server`
+        )
+        setTimeout(() => {
+          setErrorMessage(null)
+        }, 5000)
+        setNotes(notes.filter((n) => n.id !== id))
+      })
+  }
+
+  const handleNoteChange = (event) => {
+    setNewNote(event.target.value)
+  }
+
+  const notesToShow = showAll ? notes : notes.filter((note) => note.important)
 
   return (
     <div>
-      <h1>Phonebook</h1>
-      <form onSubmit={addPerson}>
-        <div>
-          Name: <input value={newName} onChange={handleNameChange} />
-        </div>
-        <div>
-          Phone <input value={newPhone} onChange={handlePhoneChange} />
-        </div>
-        <button type="submit">Add</button>
-      </form>
-      <h2>Numbers</h2>
+      <h1>Notes</h1>
+      <Notification message={errorMessage} />
+      <div>
+        <button onClick={() => setShowAll(!showAll)}>
+          show {showAll ? 'important' : 'all'}
+        </button>
+      </div>
       <ul>
-        {persons.map((person) => (
-          <li key = {person.id}>{person.name} {person.phone}</li>
+        {notesToShow.map((note) => (
+          <Note
+            key={note.id}
+            note={note}
+            toggleImportance={() => toggleImportanceOf(note.id)}
+          />
         ))}
       </ul>
+      <form onSubmit={addNote}>
+        <input value={newNote} onChange={handleNoteChange} />
+        <button type="submit">save</button>
+      </form>
+      <Footer />
     </div>
   )
 }
